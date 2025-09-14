@@ -67,24 +67,29 @@ const endCallBtn = document.getElementById('endCallBtn');
 const muteBtn = document.getElementById('muteBtn');
 const copyIdBtn = document.getElementById('copyIdBtn');
 
+const marvelCharacters = ["IronMan","SpiderMan","Thor","Hulk","BlackWidow","DoctorStrange","BlackPanther","CaptainAmerica","ScarletWitch","Vision"];
+const digits = ["0","1","2","3","4","5","6","7","8","9"];
+
 let peer;
+
+function generateMarvelId() {
+    const char = marvelCharacters[Math.floor(Math.random() * marvelCharacters.length)];
+    const d1 = digits[Math.floor(Math.random() * digits.length)];
+    const d2 = digits[Math.floor(Math.random() * digits.length)];
+    return char + d1 + d2;
+}
 
 async function initLocalStream() {
     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     localVideo.srcObject = localStream;
 }
 
-// Generate PeerJS ID
+// Generate PeerJS ID using Marvel + 2 digits
 generateIdBtn.onclick = async () => {
     await initLocalStream();
 
-    // Ensure HTTPS for mobile support
-    peer = new Peer({
-        host: 'peerjs.com',
-        port: 443,
-        secure: true,
-        debug: 2
-    });
+    const marvelId = generateMarvelId();
+    peer = new Peer(marvelId, { debug: 2 });
 
     peer.on('open', id => {
         myIdSpan.textContent = id;
