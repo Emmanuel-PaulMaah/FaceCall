@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FaceCall 1:1</title>
-<link rel="stylesheet" href="style.css">
+<title>FaceCall</title>
+<link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
@@ -14,7 +14,6 @@
   <button id="callBtn">Call</button>
   <button id="endCallBtn">End Call</button>
   <button id="muteBtn">Mute/Unmute</button>
-  <span id="status">Status: Idle</span>
   <span>Your ID: <strong id="myId"></strong></span>
   <button id="copyIdBtn">Copy ID</button>
 </div>
@@ -30,7 +29,6 @@ let localStream, currentCall, muted = false;
 const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 const myIdSpan = document.getElementById('myId');
-const statusSpan = document.getElementById('status');
 
 const generateIdBtn = document.getElementById('generateIdBtn');
 const callBtn = document.getElementById('callBtn');
@@ -56,7 +54,7 @@ async function initLocalStream() {
     localVideo.srcObject = localStream;
 }
 
-// Generate PeerJS ID
+// Generate PeerJS ID using Marvel + 2 digits
 generateIdBtn.onclick = async () => {
     await initLocalStream();
 
@@ -65,22 +63,14 @@ generateIdBtn.onclick = async () => {
 
     peer.on('open', id => {
         myIdSpan.textContent = id;
-        statusSpan.textContent = 'Status: Ready';
         console.log('My Peer ID:', id);
     });
 
     peer.on('call', call => {
         currentCall = call;
-        statusSpan.textContent = 'Status: Incoming Call';
         call.answer(localStream);
-        call.on('stream', remoteStream => {
-            remoteVideo.srcObject = remoteStream;
-            statusSpan.textContent = 'Status: Connected';
-        });
-        call.on('close', () => {
-            remoteVideo.srcObject = null;
-            statusSpan.textContent = 'Status: Call Ended';
-        });
+        call.on('stream', remoteStream => remoteVideo.srcObject = remoteStream);
+        call.on('close', () => remoteVideo.srcObject = null);
     });
 
     peer.on('error', err => alert('PeerJS error: ' + err));
@@ -90,23 +80,15 @@ generateIdBtn.onclick = async () => {
 callBtn.onclick = () => {
     const remoteId = peerIdInput.value.trim();
     if (!remoteId || !localStream) return alert("Generate ID and enter a peer ID");
-    statusSpan.textContent = 'Status: Calling...';
     currentCall = peer.call(remoteId, localStream);
-    currentCall.on('stream', remoteStream => {
-        remoteVideo.srcObject = remoteStream;
-        statusSpan.textContent = 'Status: Connected';
-    });
-    currentCall.on('close', () => {
-        remoteVideo.srcObject = null;
-        statusSpan.textContent = 'Status: Call Ended';
-    });
+    currentCall.on('stream', remoteStream => remoteVideo.srcObject = remoteStream);
+    currentCall.on('close', () => remoteVideo.srcObject = null);
 };
 
 // End call
 endCallBtn.onclick = () => {
     if (currentCall) currentCall.close();
     remoteVideo.srcObject = null;
-    statusSpan.textContent = 'Status: Idle';
 };
 
 // Mute/Unmute
@@ -121,28 +103,6 @@ copyIdBtn.onclick = () => {
     if (!peer || !peer.id) return alert("Generate your ID first");
     navigator.clipboard.writeText(peer.id).then(() => alert("ID copied!"));
 };
-
-// Make local video draggable
-localVideo.onmousedown = function(event) {
-  let shiftX = event.clientX - localVideo.getBoundingClientRect().left;
-  let shiftY = event.clientY - localVideo.getBoundingClientRect().top;
-
-  function moveAt(pageX, pageY) {
-    localVideo.style.left = pageX - shiftX + 'px';
-    localVideo.style.top = pageY - shiftY + 'px';
-  }
-
-  function onMouseMove(event) {
-    moveAt(event.pageX, event.pageY);
-  }
-
-  document.addEventListener('mousemove', onMouseMove);
-  localVideo.onmouseup = () => {
-    document.removeEventListener('mousemove', onMouseMove);
-    localVideo.onmouseup = null;
-  };
-};
-localVideo.ondragstart = () => false;
 </script>
 
 </body>
