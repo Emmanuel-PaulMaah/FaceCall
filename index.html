@@ -5,24 +5,47 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FaceCall</title>
 <style>
-  body { margin: 0; font-family: sans-serif; background: #222; color: #fff; display: flex; flex-direction: column; align-items: center; }
-  #controls { position: absolute; top: 10px; display: flex; gap: 10px; z-index: 10; }
-  #videos { position: relative; width: 100vw; height: 100vh; background: #000; display: flex; justify-content: center; align-items: center; }
-  video { background: #000; object-fit: cover; }
+  body {
+    margin: 0; font-family: sans-serif;
+    background: #222; color: #fff;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  #controls {
+    position: fixed; top: 10px; display: flex; flex-wrap: wrap;
+    gap: 10px; z-index: 10; justify-content: center; width: 95%;
+  }
+  #videos {
+    position: relative; width: 100vw; height: 100vh; background: #000;
+    display: flex; justify-content: center; align-items: center;
+  }
+  video {
+    background: #000; object-fit: cover;
+    border-radius: 5px;
+  }
   #remoteVideo { width: 100%; height: 100%; }
-  #localVideo { width: 200px; height: 150px; position: absolute; bottom: 20px; right: 20px; border: 2px solid #fff; z-index: 5; }
-  input, button { padding: 5px 10px; font-size: 16px; }
+  #localVideo {
+    width: 30%; height: auto; min-width: 100px; max-width: 150px;
+    position: absolute; bottom: 10px; right: 10px; border: 2px solid #fff; z-index: 5;
+  }
+  input, button { padding: 5px 10px; font-size: 14px; border-radius: 3px; border: none; }
+  button { cursor: pointer; background: #444; color: #fff; }
+  button:hover { background: #666; }
+  @media (max-width: 600px) {
+    #localVideo { width: 40%; bottom: 5px; right: 5px; }
+    input { width: 120px; }
+  }
 </style>
 </head>
 <body>
 
 <div id="controls">
-  <button id="generateIdBtn">Generate Your ID</button>
+  <button id="generateIdBtn">Generate My ID</button>
   <input type="text" id="peerIdInput" placeholder="Peer ID to call">
   <button id="callBtn">Call</button>
   <button id="endCallBtn">End Call</button>
   <button id="muteBtn">Mute/Unmute</button>
   <span>Your ID: <strong id="myId"></strong></span>
+  <button id="copyIdBtn">Copy ID</button>
 </div>
 
 <div id="videos">
@@ -42,6 +65,7 @@ const callBtn = document.getElementById('callBtn');
 const peerIdInput = document.getElementById('peerIdInput');
 const endCallBtn = document.getElementById('endCallBtn');
 const muteBtn = document.getElementById('muteBtn');
+const copyIdBtn = document.getElementById('copyIdBtn');
 
 let peer;
 
@@ -53,12 +77,18 @@ async function initLocalStream() {
 // Generate PeerJS ID
 generateIdBtn.onclick = async () => {
     await initLocalStream();
-    peer = new Peer(undefined, {
-        host: 'peerjs.com', port: 443, secure: true
+
+    // Ensure HTTPS for mobile support
+    peer = new Peer({
+        host: 'peerjs.com',
+        port: 443,
+        secure: true,
+        debug: 2
     });
 
     peer.on('open', id => {
         myIdSpan.textContent = id;
+        console.log('My Peer ID:', id);
     });
 
     peer.on('call', call => {
@@ -67,6 +97,8 @@ generateIdBtn.onclick = async () => {
         call.on('stream', remoteStream => remoteVideo.srcObject = remoteStream);
         call.on('close', () => remoteVideo.srcObject = null);
     });
+
+    peer.on('error', err => alert('PeerJS error: ' + err));
 };
 
 // Make a call
@@ -89,6 +121,12 @@ muteBtn.onclick = () => {
     if (!localStream) return;
     localStream.getAudioTracks()[0].enabled = muted;
     muted = !muted;
+};
+
+// Copy Peer ID
+copyIdBtn.onclick = () => {
+    if (!peer || !peer.id) return alert("Generate your ID first");
+    navigator.clipboard.writeText(peer.id).then(() => alert("ID copied!"));
 };
 </script>
 
