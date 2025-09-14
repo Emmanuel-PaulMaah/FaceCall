@@ -4,59 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FaceCall</title>
-<style>
-body {
-    font-family: sans-serif;
-    background: #111;
-    color: #fff;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-#videos {
-    display: grid;
-    gap: 10px;
-    margin-top: 20px;
-}
-video {
-    width: 300px;
-    height: 225px;
-    background: black;
-    border-radius: 8px;
-}
-#controls {
-    margin-top: 10px;
-}
-button {
-    margin: 0 5px;
-    padding: 10px 15px;
-    font-size: 16px;
-    cursor: pointer;
-    border-radius: 5px;
-    border: none;
-}
-#preview {
-    position: fixed;
-    bottom: 10px;
-    right: 10px;
-    width: 150px;
-    height: 112px;
-    border: 2px solid #fff;
-    border-radius: 8px;
-    overflow: hidden;
-    z-index: 10;
-}
-#preview video {
-    width: 100%;
-    height: 100%;
-}
-</style>
+<link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-<h1>Marvel Video Call</h1>
+<h1>FaceCall</h1>
 <div>
     <button id="createRoomBtn">Create Room</button>
     <input type="text" id="joinRoomInput" placeholder="Enter Room Code">
@@ -67,6 +19,147 @@ button {
 <div id="controls" style="display:none;">
     <button id="startCall">Start Call</button>
     <button id="endCall">End Call</button>
+    <button id="muteBtn">Mute/Unmute</button>
+</div>
+
+<div id="videos"></div>
+<div id="preview"><video id="localPreview" autoplay muted playsinline></video></div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
+<script>
+const marvelCharacters = ["IronMan","SpiderMan","Thor","Hulk","BlackWidow","DoctorStrange","BlackPanther","CaptainAmerica","ScarletWitch","Vision"];
+let localStream;
+let peer;
+let roomId;
+let peers = {};
+let muted = false;
+
+const videosContainer = document.getElementById('videos');
+const createRoomBtn = document.getElementById('createRoomBtn');
+const joinRoomBtn = document.getElementById('joinRoomBtn');
+const joinRoomInput = document.getElementById('joinRoomInput');
+const roomCodeSpan = document.getElementById('roomCode');
+const controls = document.getElementById('controls');
+const startCallBtn = document.getElementById('startCall');
+const endCallBtn = document.getElementById('endCall');
+const muteBtn = document.getElementById('muteBtn');
+const localPreview = document.getElementById('localPreview');
+
+function generateRoomCode() {
+    const char = marvelCharacters[Math.floor(Math.random() * marvelCharacters.length)];
+    const digits = Math.floor(Math.random() * 90 + 10);
+    return char + digits;
+}
+
+function addVideo(stream, id) {
+    if (document.getElementById(id)) return;
+    const video = document.createElement('video');
+    video.srcObject = stream;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.id = id;
+    videosContainer.appendChild(video);
+    updateGrid();
+}
+
+function removeVideo(id) {
+    const video = document.getElementById(id);
+    if (video) video.remove();
+    updateGrid();
+}
+
+function updateGrid() {
+    const count = videosContainer.children.length;
+    const cols = Math.ceil(Math.sqrt(count));
+    videosContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+}
+
+async function initLocalStream() {
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    localPreview.srcObject = localStream;
+}
+
+function initPeer(id) {
+    peer = new Peer(undefined, { debug: 2 });
+    
+    peer.on('open', myId => {
+        console.log('Peer ID:', myId);
+        if (id) roomId = id;
+        roomCodeSpan.textContent = `Room Code: ${roomId}`;
+        controls.style.display = 'block';
+    });
+
+    peer.on('call', call => {
+        call.answer(localStream);
+        call.on('stream', remoteStream => addVideo(remoteStream, call.peer));
+        call.on('close', () => removeVideo(call.peer));
+        peers[call.peer] = call;
+    });
+}
+
+async function startCall() {
+    await initLocalStream();
+    
+    // Call existing peers if joining
+    for (let peerId in peers) {
+        const call = peer.call(peerId, localStream);
+        call.on('stream', remoteStream => addVideo(remoteStream, call.peer));
+        call.on('close', () => removeVideo(call.peer));
+        peers[call.peer] = call;
+    }
+}
+
+// Connect to a new peer (join room)
+function connectToPeer(peerId) {
+    if (peerId === peer.id) return;
+    const call = peer.call(peerId, localStream);
+    call.on('stream', remoteStream => addVideo(remoteStream, call.peer));
+    call.on('close', () => removeVideo(call.peer));
+    peers[peerId] = call;
+}
+
+// Buttons
+createRoomBtn.addEventListener('click', async () => {
+    roomId = generateRoomCode();
+    initPeer(roomId);
+    await initLocalStream();
+    addVideo(localStream, 'localVideo');
+    alert(`Share this code to join: ${roomId}`);
+});
+
+joinRoomBtn.addEventListener('click', async () => {
+    roomId = joinRoomInput.value.trim();
+    if (!roomId) return alert('Enter a room code');
+    initPeer(roomId);
+    await initLocalStream();
+    addVideo(localStream, 'localVideo');
+
+    // Here we simulate connecting to other peers (for demo, everyone enters same code)
+    alert(`Joined room: ${roomId}. Other participants will be connected automatically when they join.`);
+});
+
+startCallBtn.addEventListener('click', startCall);
+
+endCallBtn.addEventListener('click', () => {
+    for (let p in peers) peers[p].close();
+    peers = {};
+    videosContainer.innerHTML = '';
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+        localPreview.srcObject = null;
+    }
+});
+
+muteBtn.addEventListener('click', () => {
+    if (localStream) {
+        localStream.getAudioTracks()[0].enabled = muted;
+        muted = !muted;
+    }
+});
+</script>
+</body>
+</html>    <button id="endCall">End Call</button>
     <button id="muteBtn">Mute/Unmute</button>
 </div>
 
